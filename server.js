@@ -157,7 +157,7 @@ io.on('connection', (socket) => {
         updateActivity(data.roomId);
         const player = room.players[socket.id];
         const userTyped = data.msg.trim();
-
+        io.to(data.roomId).emit('chat', { name: player.name, msg: userTyped });
         if (room.state === 'playing' && !room.hasWinner) {
             const isCorrect = room.currentWordObj.acceptedAnswers.some(ans => ans.toLowerCase() === userTyped.toLowerCase());
             if (isCorrect) {
@@ -168,7 +168,7 @@ io.on('connection', (socket) => {
                 return;
             }
         }
-        io.to(data.roomId).emit('chat', { name: player.name, msg: userTyped });
+
     });
 
     socket.on('disconnect', () => {
