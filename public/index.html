@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>이로랑 도리랑 캐치마인드🐻‍❄️✨</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f0f0; margin: 0; padding: 20px; }
+        .panel { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 600px; text-align: center; margin: 0 auto; }
+        .btn { padding: 10px 20px; font-weight: bold; cursor: pointer; border: none; background: #0984e3; color: white; border-radius: 4px; font-size: 16px; margin: 5px; }
+        .btn:hover { background: #74b9ff; }
+        .btn-danger { background: #d63031; } .btn-danger:hover { background: #ff7675; }
+        .btn-small { padding: 4px 8px; font-size: 12px; margin-left: 5px; }
+
+        #screen-home, #screen-lobby, #screen-game, #screen-result { display: none; }
+        #screen-home.active-screen, #screen-lobby.active-screen, #screen-result.active-screen { display: block !important; }
+        #screen-game.active-screen { display: flex !important; align-items: flex-start; }
+
+        #invite-box { background: #eee; padding: 10px; border-radius: 4px; margin-bottom: 20px; font-family: monospace; word-break: break-all; }
+        .lobby-settings { background: #e3f2fd; padding: 15px; border-radius: 4px; margin-top: 20px; display: none; text-align: left; border: 1px solid #90caf9;}
+        .lobby-settings input { padding: 5px; width: 60px; font-size: 16px; text-align: center; font-weight: bold;}
+        .lobby-player-list { list-style: none; padding: 0; text-align: left; }
+        .lobby-player-item { padding: 10px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
+
+        #result-leaderboard { margin: 25px 0; text-align: left; background: #fafafa; border: 1px solid #ddd; padding: 15px; border-radius: 6px; }
+        .result-item { display: flex; justify-content: space-between; padding: 12px 10px; border-bottom: 1px dashed #eee; font-size: 18px; align-items: center;}
+        .rank-1 { background: #fff9db; font-weight: bold; border-radius: 4px; border-left: 5px solid #f1c40f;}
+
+        .my-name-highlight { background: #ffeaa7 !important; color: #d63031 !important; font-weight: bold; padding: 3px 8px; border-radius: 4px; border: 1px solid #fdcb6e; display: inline-block; }
+
+        .game-layout { gap: 15px; } 
+        #left-toolbar { display: flex; flex-direction: column; gap: 15px; align-items: center; background: white; padding: 15px; border: 1px solid #ccc; width: 80px; border-radius: 4px; }
+        #palette { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .color-swatch { width: 30px; height: 30px; border: 2px solid #aaa; cursor: pointer; border-radius: 4px; }
+        .color-swatch.active { border: 3px solid #000; box-shadow: 0 0 6px rgba(0,0,0,0.6); transform: translateY(-2px); }
+        
+        .canvas-container { display: flex; flex-direction: column; gap: 10px; width: 800px; }
+        .status-header { display: flex; align-items: center; gap: 15px; background: white; padding: 10px; border-radius: 4px; border: 1px solid #ccc;}
+        .status-header h2 { margin: 0; flex-grow: 1; color: #0984e3; }
+        #host-reference-panel { display: none; background: #e3f2fd; padding: 10px; border: 1px solid #90caf9; border-radius: 4px; }
+        .ref-content { height: 120px; display: flex; align-items: center; justify-content: center; border: 1px dashed #90caf9; background: #fff; border-radius: 4px; }
+        #reference-img { max-height: 110px; border-radius: 4px; display: none; }
+        #no-ref-text { color: #888; font-weight: bold; display: none; }
+        canvas { border: 2px solid #333; background: white; cursor: crosshair; }
+        
+        #chat-container { width: 400px; display: flex; flex-direction: column; }
+        #scoreboard { background: white; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; height: 140px; overflow-y: auto; }
+        .player-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #eee; font-size: 14px; align-items: center;}
+        #chat-box { flex-grow: 1; background: white; border: 1px solid #ccc; padding: 10px; overflow-y: auto; height: 390px; }
+        #chat-input { padding: 12px; border: 1px solid #ccc; margin-top: 5px; font-size: 16px; }
+        .system-msg { color: #d63031; font-weight: bold; }
+        .disabled { background: #eee; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <div id="screen-home" class="panel active-screen">
+        <h1>이로랑 도리랑 캐치마인드🐻‍❄️✨</h1>
+        <p>친구들과 함께 즐기는 실시간 그림 퀴즈 게임</p>
+        <button id="btn-create-room" class="btn">새 게임 만들기</button>
+    </div>
+
+    <div id="screen-lobby" class="panel">
+        <h2>대기실</h2>
+        <p>아래 초대 링크를 복사하여 친구들에게 보내세요!</p>
+        <div id="invite-box">링크 생성 중...</div>
+        <button id="btn-copy" class="btn" style="background:#555;">링크 복사</button>
+        
+        <div id="lobby-settings" class="lobby-settings">
+            <strong>⚙️ 게임 설정</strong><br><br>
+            출제 할 문제 수: 
+            <input type="number" id="input-rounds" min="1" value="5"> / <span id="max-words-span">?</span> 문제
+        </div>
+
+        <button id="btn-start-game" class="btn" style="display:none; width: 100%; margin-top: 20px;">🚀 게임 시작</button>
+        
+        <h3 style="text-align: left; margin-top: 30px;">접속한 플레이어</h3>
+        <ul id="lobby-player-list" class="lobby-player-list"></ul>
+    </div>
+
+    <div id="screen-game" class="game-layout">
+        <div id="left-toolbar">
+            <div id="palette"></div>
+            <button id="eraser-btn" class="btn" style="background: white; color: black; border: 1px solid #ccc;">지우개</button>
+        </div>
+
+        <div class="canvas-container">
+            <div class="status-header">
+                <h2 id="status">대기 중...</h2>
+                <button id="pass-btn" class="btn btn-danger" style="display: none; margin: 0;">정답 공개 및 패스 ⏭️</button>
+            </div>
+            
+            <div id="host-reference-panel">
+                <strong style="color: #0984e3; display: block; margin-bottom: 5px;">🖼️ 이로 참고 이미지</strong>
+                <div class="ref-content">
+                    <img id="reference-img" src="" alt="참고">
+                    <span id="no-ref-text">참고 이미지가 없습니다.</span>
+                </div>
+            </div>
+
+            <canvas id="board" width="800" height="600"></canvas>
+        </div>
+        
+        <div id="chat-container">
+            <div id="scoreboard"><strong>👑 점수판</strong><div id="score-list"></div></div>
+            <div id="chat-box"></div>
+            <input type="text" id="chat-input" placeholder="정답 입력 (2초 딜레이)" autocomplete="off">
+        </div>
+    </div>
+
+    <div id="screen-result" class="panel">
+        <h1>🏆 최종 게임 결과</h1>
+        <p>이번 판 최고의 도리는 누구요?</p>
+        
+        <div id="result-leaderboard"></div>
+
+        <button id="btn-host-retry" class="btn" style="background: #2ecc71; width: 100%; padding: 15px; font-size: 18px; display: none;">🔄 다시하기 (새 방 링크 파기)</button>
+        <button id="btn-player-exit" class="btn" style="background: #95a5a6; width: 100%; padding: 15px; font-size: 18px; display: none;">🚪 종료 (메인 화면으로)</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
