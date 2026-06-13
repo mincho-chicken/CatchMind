@@ -173,6 +173,21 @@ passBtn.onclick = () => { socket.emit('pass_round', currentRoomId); };
 ctx.lineCap = 'round';
 
 socket.on('clear_board', () => { ctx.clearRect(0, 0, canvas.width, canvas.height); });
+
+
+// 💡 캔버스 입력관련 : pc, 핸드폰 터치 인식
+
+function getTouchPos(canvas, touchEvent) {
+    const rect = canvas.getBoundingClientRect(); // 캔버스의 현재 화면상 위치와 크기 구하기
+    return {
+        x: touchEvent.touches[0].clientX - rect.left, // 손가락 X위치 - 캔버스 왼쪽 여백
+        y: touchEvent.touches[0].clientY - rect.top   // 손가락 Y위치 - 캔버스 위쪽 여백
+    };
+}
+
+// ------------------------------------------
+// 🖱️ PC 환경 (마우스 이벤트)
+// ------------------------------------------
 canvas.addEventListener('mousedown', (e) => { if (!amIHost) return; isDrawing = true; [lastX, lastY] = [e.offsetX, e.offsetY]; });
 canvas.addEventListener('mousemove', (e) => {
     if (!isDrawing || !amIHost) return;
@@ -182,6 +197,32 @@ canvas.addEventListener('mousemove', (e) => {
 });
 canvas.addEventListener('mouseup', () => isDrawing = false);
 canvas.addEventListener('mouseout', () => isDrawing = false);
+
+
+// ------------------------------------------
+// 📱 모바일 환경 (터치 이벤트)
+// ------------------------------------------
+canvas.addEventListener('touchstart', (e) => {
+    if (!amIHost) return;
+    e.preventDefault(); // 💡 모바일 브라우저가 화면을 아래로 스크롤하는 것을 강제로 막음
+    isDrawing = true;
+    const pos = getTouchPos(canvas, e); // 변환 함수 사용
+    [lastX, lastY] = [pos.x, pos.y];
+}, { passive: false }); // preventDefault를 허용하기 위한 옵션
+
+canvas.addEventListener('touchmove', (e) => {
+    if (!isDrawing || !amIHost) return;
+    e.preventDefault(); // 💡 그리는 동안 화면 스크롤 방지
+    const pos = getTouchPos(canvas, e);
+    
+    drawLine(lastX, lastY, pos.x, pos.y, currentColor, currentWidth);
+    socket.emit('draw', { roomId: currentRoomId, x0: lastX, y0: lastY, x1: pos.x, y1: pos.y, color: currentColor, width: currentWidth });
+    [lastX, lastY] = [pos.x, pos.y];
+}, { passive: false });
+
+canvas.addEventListener('touchend', () => isDrawing = false);
+canvas.addEventListener('touchcancel', () => isDrawing = false);
+
 
 socket.on('draw', (d) => { drawLine(d.x0, d.y0, d.x1, d.y1, d.color, d.width); });
 
