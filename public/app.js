@@ -184,17 +184,38 @@ function getTouchPos(canvas, touchEvent) {
         y: touchEvent.touches[0].clientY - rect.top   // 손가락 Y위치 - 캔버스 위쪽 여백
     };
 }
+function getCanvasPos(canvas, clientX, clientY) {
+    const rect = canvas.getBoundingClientRect(); // 현재 화면에 보여지는 CSS 크기
+    
+    // 배율 계산 (실제 800 해상도 / 화면에 보이는 너비)
+    const scaleX = canvas.width / rect.width;   
+    const scaleY = canvas.height / rect.height; 
+    
+    return {
+        x: (clientX - rect.left) * scaleX, // 비율만큼 곱해서 실제 좌표로 변환
+        y: (clientY - rect.top) * scaleY
+    };
+}
 
 // ------------------------------------------
 // 🖱️ PC 환경 (마우스 이벤트)
 // ------------------------------------------
-canvas.addEventListener('mousedown', (e) => { if (!amIHost) return; isDrawing = true; [lastX, lastY] = [e.offsetX, e.offsetY]; });
+canvas.addEventListener('mousedown', (e) => { 
+    if (!amIHost) return; 
+    isDrawing = true; 
+    const pos = getCanvasPos(canvas, e.clientX, e.clientY);
+    [lastX, lastY] = [pos.x, pos.y]; 
+});
+
 canvas.addEventListener('mousemove', (e) => {
     if (!isDrawing || !amIHost) return;
-    drawLine(lastX, lastY, e.offsetX, e.offsetY, currentColor, currentWidth);
-    socket.emit('draw', { roomId: currentRoomId, x0: lastX, y0: lastY, x1: e.offsetX, y1: e.offsetY, color: currentColor, width: currentWidth });
-    [lastX, lastY] = [e.offsetX, e.offsetY];
+    const pos = getCanvasPos(canvas, e.clientX, e.clientY); // 좌표 보정
+    
+    drawLine(lastX, lastY, pos.x, pos.y, currentColor, currentWidth);
+    socket.emit('draw', { roomId: currentRoomId, x0: lastX, y0: lastY, x1: pos.x, y1: pos.y, color: currentColor, width: currentWidth });
+    [lastX, lastY] = [pos.x, pos.y];
 });
+
 canvas.addEventListener('mouseup', () => isDrawing = false);
 canvas.addEventListener('mouseout', () => isDrawing = false);
 
@@ -204,16 +225,16 @@ canvas.addEventListener('mouseout', () => isDrawing = false);
 // ------------------------------------------
 canvas.addEventListener('touchstart', (e) => {
     if (!amIHost) return;
-    e.preventDefault(); // 💡 모바일 브라우저가 화면을 아래로 스크롤하는 것을 강제로 막음
+    e.preventDefault(); 
     isDrawing = true;
-    const pos = getTouchPos(canvas, e); // 변환 함수 사용
+    const pos = getCanvasPos(canvas, e.touches[0].clientX, e.touches[0].clientY);
     [lastX, lastY] = [pos.x, pos.y];
-}, { passive: false }); // preventDefault를 허용하기 위한 옵션
+}, { passive: false }); 
 
 canvas.addEventListener('touchmove', (e) => {
     if (!isDrawing || !amIHost) return;
-    e.preventDefault(); // 💡 그리는 동안 화면 스크롤 방지
-    const pos = getTouchPos(canvas, e);
+    e.preventDefault(); 
+    const pos = getCanvasPos(canvas, e.touches[0].clientX, e.touches[0].clientY);
     
     drawLine(lastX, lastY, pos.x, pos.y, currentColor, currentWidth);
     socket.emit('draw', { roomId: currentRoomId, x0: lastX, y0: lastY, x1: pos.x, y1: pos.y, color: currentColor, width: currentWidth });

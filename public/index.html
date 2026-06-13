@@ -2,7 +2,8 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>이로랑 도리랑 캐치마인드🐻‍❄️✨</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>이로랑 도리랑🐻‍❄️✨</title>
     <style>
         body { font-family: sans-serif; background: #f0f0f0; margin: 0; padding: 20px; }
         .panel { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 600px; text-align: center; margin: 0 auto; }
@@ -27,26 +28,111 @@
 
         .my-name-highlight { background: #ffeaa7 !important; color: #d63031 !important; font-weight: bold; padding: 3px 8px; border-radius: 4px; border: 1px solid #fdcb6e; display: inline-block; }
 
-        .game-layout { gap: 15px; } 
-        #left-toolbar { display: flex; flex-direction: column; gap: 15px; align-items: center; background: white; padding: 15px; border: 1px solid #ccc; width: 80px; border-radius: 4px; }
+        .game-layout { 
+            display: flex; 
+            justify-content: space-between; 
+            gap: 15px; 
+            width: 100%; 
+            max-width: 100%; 
+            margin: 0 auto;
+            box-sizing: border-box;
+        } 
+        
+        #left-toolbar { 
+            display: flex; flex-direction: column; gap: 15px; align-items: center; 
+            background: white; padding: 15px; border: 1px solid #ccc; 
+            width: 80px; 
+            border-radius: 4px; 
+            flex-shrink: 0; 
+        }
+        
         #palette { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
         .color-swatch { width: 30px; height: 30px; border: 2px solid #aaa; cursor: pointer; border-radius: 4px; }
         .color-swatch.active { border: 3px solid #000; box-shadow: 0 0 6px rgba(0,0,0,0.6); transform: translateY(-2px); }
         
-        .canvas-container { display: flex; flex-direction: column; gap: 10px; width: 800px; }
-        .status-header { display: flex; align-items: center; gap: 15px; background: white; padding: 10px; border-radius: 4px; border: 1px solid #ccc;}
+        .canvas-container { 
+            display: flex; flex-direction: column; gap: 10px; 
+            flex-grow: 1; 
+            min-width: 400px;
+            align-items: center;
+        }
+        
+        /*.status-header { display: flex; align-items: center; gap: 15px; background: white; padding: 10px; border-radius: 4px; border: 1px solid #ccc;}*/
         .status-header h2 { margin: 0; flex-grow: 1; color: #0984e3; }
-        #host-reference-panel { display: none; background: #e3f2fd; padding: 10px; border: 1px solid #90caf9; border-radius: 4px; }
+        /* 💡 1. 캔버스 상단 패널들을 가로로 배치하는 컨테이너 */
+        .canvas-header-row {
+            display: flex;
+            justify-content: center; /* 가운데를 기준으로 모음 */
+            align-items: stretch; /* 양쪽 박스 높이를 맞춤 */
+            gap: 30px; /* 두 박스 사이의 간격 */
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        /* 💡 2. 제시어 및 버튼 카드 (시안처럼 버튼이 아래로 가게 배치) */
+        .status-header { 
+            display: flex; 
+            flex-direction: column; /* 요소를 위아래로 배치 */
+            justify-content: center;
+            align-items: flex-start; /* 좌측 정렬 */
+            gap: 15px; 
+            background: white; 
+            padding: 15px 25px; 
+            border-radius: 4px; 
+            border: 1px solid #ccc;
+            border-bottom: 5px solid #ddd; /* 시안의 입체감 있는 두꺼운 하단 테두리 재현 */
+            min-width: 250px;
+        }
+        .status-header h2 { margin: 0; color: #0984e3; }
+        
+        /* 💡 3. 참고 이미지 카드 */
+        #host-reference-panel { 
+            display: none; /* JS가 방장에게만 block으로 켜줌 */
+            background: #e3f2fd; 
+            padding: 15px; 
+            border: 1px solid #90caf9; 
+            border-radius: 4px; 
+            text-align: center;
+        }
+        .ref-content { 
+            height: 120px; display: flex; align-items: center; justify-content: center; 
+            border: 1px dashed #90caf9; background: #fff; border-radius: 4px; 
+        }
+        #reference-img { max-height: 110px; border-radius: 4px; display: none; }
+        #no-ref-text { color: #888; font-weight: bold; display: none; }
+        /* 💡 원래의 넓은 패널 형태로 복구된 CSS */
+        /*#host-reference-panel { display: none; background: #e3f2fd; padding: 10px; border: 1px solid #90caf9; border-radius: 4px; }*/
         .ref-content { height: 120px; display: flex; align-items: center; justify-content: center; border: 1px dashed #90caf9; background: #fff; border-radius: 4px; }
         #reference-img { max-height: 110px; border-radius: 4px; display: none; }
         #no-ref-text { color: #888; font-weight: bold; display: none; }
-        canvas { border: 2px solid #333; background: white; cursor: crosshair; touch-action: none;}
         
-        #chat-container { width: 400px; display: flex; flex-direction: column; }
+        canvas { 
+            width: 100%; 
+            max-width: calc((100vh - 280px) * 4 / 3);
+            aspect-ratio: 4 / 3; 
+            border: 2px solid #333; 
+            background: white; 
+            cursor: crosshair; 
+            touch-action: none; 
+        }
+        
+        #chat-container { 
+            width: 400px; 
+            display: flex; flex-direction: column; 
+            flex-shrink: 0;
+        }
+        
         #scoreboard { background: white; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; height: 140px; overflow-y: auto; }
         .player-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #eee; font-size: 14px; align-items: center;}
         #chat-box { flex-grow: 1; background: white; border: 1px solid #ccc; padding: 10px; overflow-y: auto; height: 390px; }
-        #chat-input { padding: 12px; border: 1px solid #ccc; margin-top: 5px; font-size: 16px; }
+        
+        #chat-input { 
+            padding: 12px; 
+            border: 1px solid #ccc; 
+            margin-top: 5px; 
+            font-size: 16px !important; 
+        }
+        
         .system-msg { color: #d63031; font-weight: bold; }
         .disabled { background: #eee; cursor: not-allowed; }
     </style>
@@ -54,8 +140,8 @@
 <body>
 
     <div id="screen-home" class="panel active-screen">
-        <h1>이로랑 도리랑 캐치마인드🐻‍❄️✨</h1>
-        <p>이로의 보카로 그림 맞추기! </p>
+        <h1>🎨이로랑 도리랑 보카로 캐치마인드</h1>
+        <p>이로랑 도리랑 실시간 그림 퀴즈</p>
         <button id="btn-create-room" class="btn">새 게임 만들기</button>
     </div>
 
@@ -78,25 +164,27 @@
     </div>
 
     <div id="screen-game" class="game-layout">
+        
         <div id="left-toolbar">
             <div id="palette"></div>
             <button id="eraser-btn" class="btn" style="background: white; color: black; border: 1px solid #ccc;">지우개</button>
         </div>
 
         <div class="canvas-container">
-            <div class="status-header">
-                <h2 id="status">대기 중...</h2>
-                <button id="pass-btn" class="btn btn-danger" style="display: none; margin: 0;">정답 공개 및 패스 ⏭️</button>
-            </div>
+            <div class="canvas-header-row">
+                <div class="status-header">
+                    <h2 id="status">대기 중...</h2>
+                    <button id="pass-btn" class="btn btn-danger" style="display: none; margin: 0;">정답 공개 및 패스 ⏭️</button>
+                </div>
             
-            <div id="host-reference-panel">
-                <strong style="color: #0984e3; display: block; margin-bottom: 5px;">🖼️ 이로 참고 이미지</strong>
-                <div class="ref-content">
-                    <img id="reference-img" src="" alt="참고">
-                    <span id="no-ref-text">참고 이미지가 없습니다.</span>
+                <div id="host-reference-panel">
+                    <strong style="color: #0984e3; display: block; margin-bottom: 5px;">🖼️ 이로 참고 이미지</strong>
+                    <div class="ref-content">
+                        <img id="reference-img" src="" alt="참고">
+                        <span id="no-ref-text">참고 이미지가 없습니다.</span>
+                    </div>
                 </div>
             </div>
-
             <canvas id="board" width="800" height="600"></canvas>
         </div>
         
@@ -109,7 +197,7 @@
 
     <div id="screen-result" class="panel">
         <h1>🏆 최종 게임 결과</h1>
-        <p>이번 판 최고의 도리는 누구?</p>
+        <p>이번 판 최고의 도리 누구?</p>
         
         <div id="result-leaderboard"></div>
 
