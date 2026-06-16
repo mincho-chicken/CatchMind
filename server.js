@@ -111,15 +111,28 @@ io.on('connection', (socket) => {
             const target = room.players[targetId];
             if(target) room.bannedDevices.push(target.deviceId);
             
+            const wasDrawer = (targetId === room.drawerId);
+
             io.to(targetId).emit('room_closed', '방장에 의해 강퇴되었습니다.');
             io.sockets.sockets.get(targetId)?.leave(roomId);
             delete room.players[targetId];
             if (room.turnOrder) room.turnOrder = room.turnOrder.filter(id => id !== targetId);
 
+            // 💡 수정 1: 강퇴 시 방장에게 딜레이 없이 즉각 권한 회수
+            if (wasDrawer && room.state === 'playing' && !room.hasWinner) {
+                io.to(roomId).emit('system', `⚠️ 그림을 그리던 유저가 강퇴되어 방장에게 그리기 권한이 회수됩니다.`);
+                room.hasWinner = true;
+                
+                room.gameMode = 'solo';       // 방장 혼자 그리기 모드로 고정
+                room.drawerId = room.hostId;  // 3초 대기할 필요 없이 그 즉시 방장을 그리는 사람으로 세팅
+                
+                setTimeout(() => startNextRound(roomId), 3000);
+            }
+
             io.to(roomId).emit('update_room_state', { state: room.state, hostId: room.hostId, drawerId: room.drawerId, players: room.players, totalWords: wordList.length, gameMode: room.gameMode });
         }
     });
-
+    
     socket.on('start_game', (roomId, maxRounds) => {
         const room = rooms[roomId];
         if (room && socket.id === room.hostId && room.state === 'lobby') {
@@ -196,7 +209,6 @@ io.on('connection', (socket) => {
             }
         }
     });
-
     socket.on('disconnect', () => {
         for (const roomId in rooms) {
             const room = rooms[roomId];
@@ -215,10 +227,14 @@ io.on('connection', (socket) => {
                     io.to(roomId).emit('system', `📢 [${room.players[room.hostId].name}] 님이 새로운 방장이 되었습니다.`);
                 }
 
-                // 💡 그림 그리는 사람이 나간 경우 턴을 강제로 넘김
+                // 💡 수정 2: 그리는 사람이 새로고침/종료로 도망갔을 때도 동일하게 방장에게 권한 회수
                 if (wasDrawer && room.state === 'playing' && !room.hasWinner) {
-                    io.to(roomId).emit('system', `⚠️ 그림을 그리던 유저가 퇴장하여 다음 문제로 넘어갑니다.`);
+                    io.to(roomId).emit('system', `⚠️ 그림을 그리던 유저가 퇴장하여 방장에게 그리기 권한이 회수됩니다.`);
                     room.hasWinner = true;
+                    
+                    room.gameMode = 'solo';       // 방장 혼자 그리기 모드로 고정
+                    room.drawerId = room.hostId;  // 즉각 방장에게 권한 회수
+                    
                     setTimeout(() => startNextRound(roomId), 3000);
                 }
 
@@ -226,6 +242,7 @@ io.on('connection', (socket) => {
             }
         }
     });
+
 });
 
 function startNextRound(roomId) {
