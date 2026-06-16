@@ -345,8 +345,8 @@ chatInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter' && chatInput.value.trim() !== '') {
         socket.emit('chat', { roomId: currentRoomId, msg: chatInput.value });
         chatInput.value = '';
-        chatInput.disabled = true; chatInput.classList.add('disabled'); chatInput.placeholder = "2초 대기...";
-        setTimeout(() => { chatInput.disabled = false; chatInput.classList.remove('disabled'); chatInput.placeholder = "정답 입력"; chatInput.focus(); }, 2000);
+        chatInput.disabled = true; chatInput.classList.add('disabled'); chatInput.placeholder = "1초 대기...";
+        setTimeout(() => { chatInput.disabled = false; chatInput.classList.remove('disabled'); chatInput.placeholder = "정답 입력"; chatInput.focus(); }, 1000);
     }
 });
 
