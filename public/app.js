@@ -21,6 +21,8 @@ const inputRounds = document.getElementById('input-rounds');
 const maxWordsSpan = document.getElementById('max-words-span');
 const resultLeaderboard = document.getElementById('result-leaderboard'); 
 
+const btnModeSolo = document.getElementById('btn-mode-solo');
+const btnModeTurn = document.getElementById('btn-mode-turn');
 const btnHostRetry = document.getElementById('btn-host-retry'); 
 const btnPlayerExit = document.getElementById('btn-player-exit'); 
 
@@ -32,7 +34,17 @@ const eraserBtn = document.getElementById('eraser-btn'); const passBtn = documen
 const refPanel = document.getElementById('host-reference-panel'); const refImg = document.getElementById('reference-img');
 const noRefText = document.getElementById('no-ref-text');
 
-let currentRoomId = null; let myId = null; let amIHost = false;
+const widthSlider = document.getElementById('width-slider');
+const clearBtn = document.getElementById('clear-btn');
+const undoBtn = document.getElementById('undo-btn');
+const redoBtn = document.getElementById('redo-btn');
+const customCursor = document.getElementById('custom-cursor');
+
+// 💡 방장 권한(amIHost)과 그리기 권한(amIDrawer)을 철저하게 분리
+let currentRoomId = null; let myId = null; 
+let amIHost = false; 
+let amIDrawer = false; 
+
 const urlParams = new URLSearchParams(window.location.search);
 const roomParam = urlParams.get('room');
 const actionParam = urlParams.get('action');
@@ -56,19 +68,21 @@ socket.on('room_created', (roomId) => {
 });
 btnCopy.onclick = () => { navigator.clipboard.writeText(window.location.href); btnCopy.innerText = "복사 완료!"; setTimeout(() => btnCopy.innerText = "링크 복사", 2000); };
 
+btnModeSolo.onclick = () => { if (amIHost) socket.emit('change_mode', currentRoomId, 'solo'); };
+btnModeTurn.onclick = () => { if (amIHost) socket.emit('change_mode', currentRoomId, 'turn'); };
 btnStartGame.onclick = () => { socket.emit('start_game', currentRoomId, parseInt(inputRounds.value)); };
 
-btnHostRetry.onclick = () => {
-    socket.emit('host_retry_action', currentRoomId);
-    window.location.href = '/?action=host_retry';
-};
+btnHostRetry.onclick = () => { socket.emit('host_retry_action', currentRoomId); window.location.href = '/?action=host_retry'; };
 btnPlayerExit.onclick = () => { window.location.href = '/'; };
 
 socket.on('go_to_main', (msg) => { alert(msg); window.location.href = '/'; });
 
 socket.on('update_room_state', (data) => {
-    amIHost = (data && socket.id === data.hostId);
     if (!data) return;
+    
+    // 💡 방장인지, 그리고 현재 차례(그리는 사람)인지 갱신
+    amIHost = (socket.id === data.hostId);
+    amIDrawer = (socket.id === data.drawerId);
     
     if (data.state === 'lobby') {
         showScreen(screenLobby);
@@ -77,8 +91,16 @@ socket.on('update_room_state', (data) => {
         if (amIHost) {
             btnStartGame.style.display = 'block'; lobbySettings.style.display = 'block';
             inputRounds.max = data.totalWords; maxWordsSpan.innerText = data.totalWords;
+            btnModeSolo.disabled = false; btnModeTurn.disabled = false; 
         } else {
             btnStartGame.style.display = 'none'; lobbySettings.style.display = 'none';
+            btnModeSolo.disabled = true; btnModeTurn.disabled = true; 
+        }
+
+        if (data.gameMode === 'solo') {
+            btnModeSolo.classList.add('active'); btnModeTurn.classList.remove('active');
+        } else {
+            btnModeTurn.classList.add('active'); btnModeSolo.classList.remove('active');
         }
         
         lobbyPlayerList.innerHTML = '';
@@ -87,6 +109,8 @@ socket.on('update_room_state', (data) => {
             const nameSpan = isMe ? `<span class="my-name-highlight">${isHost ? '👑 ' : '👤 '} ${p.name} (나)</span>` : `<span>${isHost ? '👑 ' : '👤 '} ${p.name}</span>`;
             let html = `<li class="lobby-player-item">${nameSpan}<div>`;
             if (isMe || amIHost) html += `<button class="btn btn-small" onclick="changeName('${id}')">이름변경</button>`;
+            
+            // 강퇴는 무조건 방장만(amIHost)
             if (amIHost && !isMe) html += `<button class="btn btn-small btn-danger" onclick="kickPlayer('${id}')">강퇴</button>`;
             html += `</div></li>`; lobbyPlayerList.innerHTML += html;
         }
@@ -96,15 +120,33 @@ socket.on('update_room_state', (data) => {
         scoreList.innerHTML = '';
         for (const id in data.players) {
             const p = data.players[id]; const isMe = (id === socket.id);
-            const hostTag = (id === data.hostId) ? '🎨 ' : '👤 ';
-            const nameRender = isMe ? `<span class="my-name-highlight">${hostTag}${p.name} (나)</span>` : `<span>${hostTag}${p.name}</span>`;
+            const isHost = (id === data.hostId);
+            const isDrawer = (id === data.drawerId);
+            
+            let tags = '';
+            if (isHost) tags += '👑 ';
+            if (isDrawer) tags += '🎨 ';
+            if (!isHost && !isDrawer) tags += '👤 ';
+
+            const nameRender = isMe ? `<span class="my-name-highlight">${tags}${p.name} (나)</span>` : `<span>${tags}${p.name}</span>`;
             let html = `<div class="player-item"><div>${nameRender} <strong>${p.score} 점</strong></div>`;
+            
+            // 강퇴는 무조건 방장만(amIHost)
             if (amIHost && !isMe) html += `<button class="btn btn-small btn-danger" onclick="kickPlayer('${id}')">강퇴</button>`;
             html += `</div>`; scoreList.innerHTML += html;
         }
 
-        if (amIHost) { leftToolbar.style.visibility = 'visible'; passBtn.style.display = 'block'; refPanel.style.display = 'block'; } 
-        else { leftToolbar.style.visibility = 'hidden'; passBtn.style.display = 'none'; refPanel.style.display = 'none'; statusText.innerText = "그림을 보고 정답을 맞춰보세요!"; }
+        // 💡 캔버스 제어 UI는 무조건 '그리는 사람(amIDrawer)' 에게만 보임!
+        if (amIDrawer) { 
+            leftToolbar.style.visibility = 'visible'; 
+            passBtn.style.display = 'block'; 
+            refPanel.style.display = 'block'; 
+        } else { 
+            leftToolbar.style.visibility = 'hidden'; 
+            passBtn.style.display = 'none'; 
+            refPanel.style.display = 'none'; 
+            statusText.innerText = "그림을 보고 정답을 맞춰보세요!"; 
+        }
     }
 });
 
@@ -129,8 +171,9 @@ socket.on('game_over', (sortedPlayers) => {
     else { btnHostRetry.style.display = 'none'; btnPlayerExit.style.display = 'block'; }
 });
 
+// 💡 턴을 넘겨받은 사람만 이 제시어 비밀 메시지를 수신
 socket.on('host_secret', (data) => {
-    if (amIHost) {
+    if (amIDrawer) {
         statusText.innerText = data.msg;
         if (data.imageUrl) { refImg.src = data.imageUrl; refImg.style.display = 'block'; noRefText.style.display = 'none'; } 
         else { refImg.src = ''; refImg.style.display = 'none'; noRefText.style.display = 'block'; }
@@ -149,7 +192,9 @@ window.kickPlayer = (targetId) => {
 };
 
 let isDrawing = false; let lastX = 0; let lastY = 0;
-let currentColor = '#000000'; let currentWidth = 1;
+let currentColor = '#000000'; let currentWidth = 3; 
+
+widthSlider.oninput = (e) => { currentWidth = parseInt(e.target.value); };
 
 const colors = ['#000000', '#555555', '#ff0000', '#ff7f00', '#ffff00', '#00ff00', '#0000ff', '#4b0082', '#9400d3', '#ffc0cb', '#8b4513', '#00ffff', '#32cd32', '#ff00ff', '#008080', '#000080'];
 colors.forEach((color, i) => {
@@ -158,7 +203,8 @@ colors.forEach((color, i) => {
     div.onclick = () => { 
         document.querySelectorAll('.color-swatch').forEach(e => e.classList.remove('active'));
         eraserBtn.style.background = 'white'; eraserBtn.style.color = 'black';
-        div.classList.add('active'); currentColor = color; currentWidth = 1; 
+        div.classList.add('active'); currentColor = color; 
+        currentWidth = parseInt(widthSlider.value); 
     };
     palette.appendChild(div);
 });
@@ -166,51 +212,95 @@ colors.forEach((color, i) => {
 eraserBtn.onclick = () => { 
     document.querySelectorAll('.color-swatch').forEach(e => e.classList.remove('active'));
     eraserBtn.style.background = '#555'; eraserBtn.style.color = 'white';
-    currentColor = '#ffffff'; currentWidth = 20; 
+    currentColor = '#ffffff'; currentWidth = 20; widthSlider.value = 20;
 };
 
-passBtn.onclick = () => { socket.emit('pass_round', currentRoomId); };
+// 패스는 그리는 사람(amIDrawer)만 호출 가능
+passBtn.onclick = () => { if (amIDrawer) socket.emit('pass_round', currentRoomId); };
 ctx.lineCap = 'round';
 
-socket.on('clear_board', () => { ctx.clearRect(0, 0, canvas.width, canvas.height); });
+let undoStack = [];
+let redoStack = [];
+const MAX_HISTORY = 15; 
 
+function saveState() {
+    if (undoStack.length >= MAX_HISTORY) undoStack.shift();
+    undoStack.push(canvas.toDataURL()); 
+    redoStack = []; 
+}
 
-// 💡 캔버스 입력관련 : pc, 핸드폰 터치 인식
-
-function getTouchPos(canvas, touchEvent) {
-    const rect = canvas.getBoundingClientRect(); // 캔버스의 현재 화면상 위치와 크기 구하기
-    return {
-        x: touchEvent.touches[0].clientX - rect.left, // 손가락 X위치 - 캔버스 왼쪽 여백
-        y: touchEvent.touches[0].clientY - rect.top   // 손가락 Y위치 - 캔버스 위쪽 여백
+function restoreState(dataUrl) {
+    const img = new Image();
+    img.src = dataUrl;
+    img.onload = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+        socket.emit('sync_board', { roomId: currentRoomId, image: dataUrl }); 
     };
 }
+
+function undo() {
+    if (!amIDrawer || undoStack.length === 0) return;
+    redoStack.push(canvas.toDataURL()); 
+    restoreState(undoStack.pop());
+}
+
+function redo() {
+    if (!amIDrawer || redoStack.length === 0) return;
+    undoStack.push(canvas.toDataURL()); 
+    restoreState(redoStack.pop());
+}
+
+undoBtn.onclick = undo;
+redoBtn.onclick = redo;
+window.addEventListener('keydown', (e) => {
+    if (!amIDrawer) return;
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
+});
+
+clearBtn.onclick = () => {
+    if (!amIDrawer) return; // 전체 지우기도 그리는 사람만 가능
+    saveState();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    socket.emit('clear_board', currentRoomId);
+};
+
+socket.on('clear_board', () => { ctx.clearRect(0, 0, canvas.width, canvas.height); });
+socket.on('sync_board', (dataUrl) => {
+    const img = new Image(); img.src = dataUrl;
+    img.onload = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0); };
+});
+
 function getCanvasPos(canvas, clientX, clientY) {
-    const rect = canvas.getBoundingClientRect(); // 현재 화면에 보여지는 CSS 크기
-    
-    // 배율 계산 (실제 800 해상도 / 화면에 보이는 너비)
+    const rect = canvas.getBoundingClientRect(); 
     const scaleX = canvas.width / rect.width;   
     const scaleY = canvas.height / rect.height; 
-    
-    return {
-        x: (clientX - rect.left) * scaleX, // 비율만큼 곱해서 실제 좌표로 변환
-        y: (clientY - rect.top) * scaleY
-    };
+    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
 }
 
-// ------------------------------------------
-// 🖱️ PC 환경 (마우스 이벤트)
-// ------------------------------------------
+// 💡 이하 모든 터치 및 그리기 권한을 amIDrawer로 제어
 canvas.addEventListener('mousedown', (e) => { 
-    if (!amIHost) return; 
+    if (!amIDrawer) return; 
+    saveState(); 
     isDrawing = true; 
     const pos = getCanvasPos(canvas, e.clientX, e.clientY);
     [lastX, lastY] = [pos.x, pos.y]; 
 });
 
 canvas.addEventListener('mousemove', (e) => {
-    if (!isDrawing || !amIHost) return;
-    const pos = getCanvasPos(canvas, e.clientX, e.clientY); // 좌표 보정
+    if (amIDrawer) {
+        customCursor.style.display = 'block';
+        customCursor.style.left = e.clientX + 'px';
+        customCursor.style.top = e.clientY + 'px';
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = rect.width / canvas.width;
+        customCursor.style.width = (currentWidth * scaleX) + 'px';
+        customCursor.style.height = (currentWidth * scaleX) + 'px';
+    }
     
+    if (!isDrawing || !amIDrawer) return;
+    const pos = getCanvasPos(canvas, e.clientX, e.clientY);
     drawLine(lastX, lastY, pos.x, pos.y, currentColor, currentWidth);
     socket.emit('draw', { roomId: currentRoomId, x0: lastX, y0: lastY, x1: pos.x, y1: pos.y, color: currentColor, width: currentWidth });
     [lastX, lastY] = [pos.x, pos.y];
@@ -219,20 +309,17 @@ canvas.addEventListener('mousemove', (e) => {
 canvas.addEventListener('mouseup', () => isDrawing = false);
 canvas.addEventListener('mouseout', () => isDrawing = false);
 
-
-// ------------------------------------------
-// 📱 모바일 환경 (터치 이벤트)
-// ------------------------------------------
 canvas.addEventListener('touchstart', (e) => {
-    if (!amIHost) return;
+    if (!amIDrawer) return;
     e.preventDefault(); 
+    saveState(); 
     isDrawing = true;
     const pos = getCanvasPos(canvas, e.touches[0].clientX, e.touches[0].clientY);
     [lastX, lastY] = [pos.x, pos.y];
 }, { passive: false }); 
 
 canvas.addEventListener('touchmove', (e) => {
-    if (!isDrawing || !amIHost) return;
+    if (!isDrawing || !amIDrawer) return;
     e.preventDefault(); 
     const pos = getCanvasPos(canvas, e.touches[0].clientX, e.touches[0].clientY);
     
@@ -244,10 +331,11 @@ canvas.addEventListener('touchmove', (e) => {
 canvas.addEventListener('touchend', () => isDrawing = false);
 canvas.addEventListener('touchcancel', () => isDrawing = false);
 
+canvas.addEventListener('mouseenter', () => { if (amIDrawer) canvas.classList.add('host-mode'); });
+canvas.addEventListener('mouseleave', () => { customCursor.style.display = 'none'; isDrawing = false; });
 
 socket.on('draw', (d) => { drawLine(d.x0, d.y0, d.x1, d.y1, d.color, d.width); });
 
-// 💡 중요 버그 수정 완료: 브라우저가 ctx.stroke를 인식하도록 스코프 명시 검수 완료
 function drawLine(x0, y0, x1, y1, color, width) {
     ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width;
     ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.closePath();
